@@ -70,7 +70,8 @@ else:
 #放在本地工程根目录文件夹
 
 
-model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.bfloat16)
+#model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.bfloat16)
+model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.float16)
 tokenizer = TRIE_TOKENIZER('./ringrwkv/rwkv_vocab_v20230424.txt')
 
 
@@ -80,14 +81,14 @@ model = model.to(device)
 
 def evaluate(
     instruction,
-    temperature=1,
-    top_p=0.7,
-    top_k = 0.1,
-    penalty_alpha = 0.1,
+    temperature=1.3,
+    top_p=0.4,
+    # top_k = 0.1,
+    penalty_alpha = 0.4,
     max_new_tokens=128,
 ):
     
-    prompt = f'Question: {instruction.strip()}\n\nAnswer:'
+    prompt = f'{instruction.strip()}'
     input_ids = tokenizer.encode(prompt)
     input_ids = torch.tensor(input_ids).unsqueeze(0).to(device)
     #out = model.generate(input_ids=input_ids.to(device),max_new_tokens=40)
@@ -101,8 +102,8 @@ def evaluate(
                                 # possibilities of negative prompting that are explored in the paper
                                             #CFGLogits(1.5, neg_prompt.to(device), model),
                                             CFGLogits(1.5, input_ids, model),
-                                            TemperatureLogitsWarper(0.8),
-                                            TopPLogitsWarper(0.95),
+                                            TemperatureLogitsWarper(temperature),
+                                            TopPLogitsWarper(top_p),
                                             ]),do_sample=True,)
     outlist = out[0].tolist()
     for i  in outlist:
@@ -121,8 +122,8 @@ gr.Interface(
         ),
         gr.components.Slider(minimum=0, maximum=2, value=1, label="Temperature"),
         gr.components.Slider(minimum=0, maximum=1, value=0.7, label="Top p"),
-        gr.components.Slider(minimum=0, maximum=1, step=1, value=0.1, label="top_k"),
-        gr.components.Slider(minimum=0, maximum=1, step=1, value=0.1, label="penalty_alpha"),
+        # gr.components.Slider(minimum=0, maximum=1, step=1, value=0.1, label="top_k"),
+        gr.components.Slider(minimum=0, maximum=1, step=0.1, value=0.1, label="penalty_alpha"),
         gr.components.Slider(
             minimum=1, maximum=2000, step=1, value=128, label="Max tokens"
         ),
@@ -133,6 +134,6 @@ gr.Interface(
             label="Output",
         )
     ],
-    title="RWKV-World-Alpaca",
+    title="RWKV-World-alpaca",
     description="RWKV,Easy In HF.",
 ).launch()
