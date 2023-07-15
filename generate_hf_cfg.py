@@ -56,7 +56,10 @@ class CFGLogits(LogitsProcessor):
             )
         unconditional_logits = F.log_softmax(self.out.logits[0][-1:], dim=-1)
         out = self.guidance_scale * (scores - unconditional_logits) + unconditional_logits
-        return out
+        #return out
+
+        out = F.log_softmax(out, dim=-1)
+        return 0.7 * out + 0.3 * scores
 
 
 
@@ -101,7 +104,7 @@ def evaluate(
                             # inputs_cfg usually is the last token of the prompt but there are
                                 # possibilities of negative prompting that are explored in the paper
                                             #CFGLogits(1.5, neg_prompt.to(device), model),
-                                            CFGLogits(1.5, input_ids, model),
+                                            CFGLogits(3, input_ids, model),
                                             TemperatureLogitsWarper(temperature),
                                             TopPLogitsWarper(top_p),
                                             ]),do_sample=True,)
@@ -120,10 +123,10 @@ gr.Interface(
         gr.components.Textbox(
             lines=2, label="Instruction", placeholder="Tell me about alpacas."
         ),
-        gr.components.Slider(minimum=0, maximum=2, value=1, label="Temperature"),
-        gr.components.Slider(minimum=0, maximum=1, value=0.7, label="Top p"),
+        gr.components.Slider(minimum=0, maximum=2, value=1.4, label="Temperature"),
+        gr.components.Slider(minimum=0, maximum=1, value=0.3, label="Top p"),
         # gr.components.Slider(minimum=0, maximum=1, step=1, value=0.1, label="top_k"),
-        gr.components.Slider(minimum=0, maximum=1, step=0.1, value=0.1, label="penalty_alpha"),
+        gr.components.Slider(minimum=0, maximum=1, step=0.1, value=0.4, label="penalty_alpha"),
         gr.components.Slider(
             minimum=1, maximum=2000, step=1, value=128, label="Max tokens"
         ),
