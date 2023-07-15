@@ -57,10 +57,10 @@ class CFGLogits(LogitsProcessor):
             )
         unconditional_logits = F.log_softmax(self.out.logits[0][-1:], dim=-1)
         out = self.guidance_scale * (scores - unconditional_logits) + unconditional_logits
-        #return out
+        return out
 
-        out = F.log_softmax(out, dim=-1)
-        return 0.7 * out + 0.3 * scores
+        # out = F.log_softmax(out, dim=-1)
+        # return 0.7 * out + 0.3 * scores
 
 
 
