@@ -53,6 +53,7 @@ class CFGLogits(LogitsProcessor):
                 input_ids[:, -1:],
                 use_cache=True,
                 # past_key_values=self.out.past_key_values,
+                state = self.out.state
             )
         unconditional_logits = F.log_softmax(self.out.logits[0][-1:], dim=-1)
         out = self.guidance_scale * (scores - unconditional_logits) + unconditional_logits
@@ -73,13 +74,14 @@ else:
 #放在本地工程根目录文件夹
 
 
-#model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.bfloat16)
-model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.float16)
+model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.bfloat16)
+# model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.float16)
 tokenizer = TRIE_TOKENIZER('./ringrwkv/rwkv_vocab_v20230424.txt')
 
 
 #model= PeftModel.from_pretrained(model, "./lora-out")
 model = model.to(device)
+#model = torch.compile(model) #need pytorch 2.0
 
 
 def evaluate(
