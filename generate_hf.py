@@ -1,11 +1,65 @@
 import torch
-from peft import PeftModel
+#from peft import PeftModel
 import transformers
 import gradio as gr
 
 from ringrwkv.configuration_rwkv_world import RwkvConfig
 from ringrwkv.rwkv_tokenizer import TRIE_TOKENIZER
 from ringrwkv.modehf_world import RwkvForCausalLM
+from transformers import LogitsProcessorList, TemperatureLogitsWarper, TopPLogitsWarper
+from transformers import (LogitsProcessor, LogitsProcessorList,
+                          MinLengthLogitsProcessor, TemperatureLogitsWarper,
+                          TopKLogitsWarper, TopPLogitsWarper,
+                          TypicalLogitsWarper)
+import torch.nn.functional as F
+
+class CFGLogits(LogitsProcessor):
+    r"""Logits processor for Classifier-Free Guidance (CFG). The processors
+    computes a weighted average across scores from prompt conditional and prompt unconditional (or negative) logits,
+    parameterized by the `guidance_scale`. The unconditional scores are computed internally by prompting `model` with
+    the `uncond` branch. Finally, according to CFG Rescale, the reweighted logits are interpolated back with weight
+    `rescale_factor` the conditional ones to smooth the effect and increase output quality.
+
+    See [the paper](https://arxiv.org/abs/2306.17806) for more information.
+
+    Args:
+        guidance_scale (float):
+            The guidance scale for classifier free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`.
+            Higher guidance scale encourages the model to generate samples that are more closely linked to the input
+            prompt, usually at the expense of poorer quality.
+        uncond (`torch.LongTensor` of shape `(batch_size, sequence_length)`):
+            Indices of input sequence tokens in the vocabulary for the unconditional branch.
+        model:
+            The LM computing the unconditional scores. Supposedly the same as the one computing the conditional scores.
+            Both models must use the same tokenizer.
+    """
+
+    def __init__(self, guidance_scale, uncond, model):
+        self.guidance_scale = guidance_scale
+        self.uncond = uncond
+        self.model = model
+        self.out = None
+        self.rescale_factor = 1 #rescale_factor
+
+    def __call__(self, input_ids, scores):
+        scores = F.log_softmax(scores, dim=-1)
+        if self.guidance_scale == 1:
+            return scores
+
+        if self.out is None:
+            self.out = self.model(self.uncond, use_cache=True)
+        else:
+            self.out = self.model(
+                input_ids[:, -1:],
+                use_cache=True,
+                # past_key_values=self.out.past_key_values,
+            )
+        unconditional_logits = F.log_softmax(self.out.logits[0][-1:], dim=-1)
+        out = self.guidance_scale * (scores - unconditional_logits) + unconditional_logits
+        return out
+
+
+
 
 
 if torch.cuda.is_available():
@@ -16,7 +70,7 @@ else:
 #放在本地工程根目录文件夹
 
 
-model = RwkvForCausalLM.from_pretrained("RWKV-4-World-1.5B")
+model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.bfloat16)
 tokenizer = TRIE_TOKENIZER('./ringrwkv/rwkv_vocab_v20230424.txt')
 
 
@@ -35,9 +89,21 @@ def evaluate(
     
     prompt = f'Question: {instruction.strip()}\n\nAnswer:'
     input_ids = tokenizer.encode(prompt)
-    input_ids = torch.tensor(input_ids).unsqueeze(0)
+    input_ids = torch.tensor(input_ids).unsqueeze(0).to(device)
     #out = model.generate(input_ids=input_ids.to(device),max_new_tokens=40)
-    out = model.generate(input_ids=input_ids.to(device),temperature=temperature,top_p=top_p,top_k=top_k,penalty_alpha=penalty_alpha,max_new_tokens=max_new_tokens)
+    out = model.generate(input_ids=input_ids,
+                        #  temperature=temperature,
+                        #  top_p=top_p,top_k=top_k,
+                         penalty_alpha=penalty_alpha,
+                         max_new_tokens=max_new_tokens,
+                         logits_processor=LogitsProcessorList([
+                            # inputs_cfg usually is the last token of the prompt but there are
+                                # possibilities of negative prompting that are explored in the paper
+                                            #CFGLogits(1.5, neg_prompt.to(device), model),
+                                            CFGLogits(1.5, input_ids, model),
+                                            TemperatureLogitsWarper(0.8),
+                                            TopPLogitsWarper(0.95),
+                                            ]),do_sample=True,)
     outlist = out[0].tolist()
     for i  in outlist:
         if i==0:
