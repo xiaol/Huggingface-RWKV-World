@@ -81,8 +81,8 @@ tokenizer = TRIE_TOKENIZER('./ringrwkv/rwkv_vocab_v20230424.txt')
 
 #model= PeftModel.from_pretrained(model, "./lora-out")
 model = model.half()
+# model = torch.compile(model) #need pytorch 2.0 and linux
 model = model.to(device)
-#model = torch.compile(model) #need pytorch 2.0
 
 
 def evaluate(
@@ -90,6 +90,7 @@ def evaluate(
     temperature=1.3,
     top_p=0.4,
     # top_k = 0.1,
+    cfg =3,
     penalty_alpha = 0.4,
     max_new_tokens=128,
 ):
@@ -107,7 +108,7 @@ def evaluate(
                             # inputs_cfg usually is the last token of the prompt but there are
                                 # possibilities of negative prompting that are explored in the paper
                                             #CFGLogits(1.5, neg_prompt.to(device), model),
-                                            CFGLogits(3, input_ids, model),
+                                            CFGLogits(cfg, input_ids, model),
                                             TemperatureLogitsWarper(temperature),
                                             TopPLogitsWarper(top_p),
                                             ]),do_sample=True,)
@@ -128,7 +129,7 @@ gr.Interface(
         ),
         gr.components.Slider(minimum=0, maximum=2, value=1.4, label="Temperature"),
         gr.components.Slider(minimum=0, maximum=1, value=0.3, label="Top p"),
-        # gr.components.Slider(minimum=0, maximum=1, step=1, value=0.1, label="top_k"),
+        gr.components.Slider(minimum=-5, maximum=5, step=0.1, value=3, label="cfg"),
         gr.components.Slider(minimum=0, maximum=1, step=0.1, value=0.4, label="penalty_alpha"),
         gr.components.Slider(
             minimum=1, maximum=2000, step=1, value=128, label="Max tokens"
