@@ -74,12 +74,13 @@ else:
 #放在本地工程根目录文件夹
 
 
-model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.bfloat16)
-# model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.float16)
+#model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.bfloat16)
+model = RwkvForCausalLM.from_pretrained("RWKV-4-World-7B", torch_dtype=torch.float16)
 tokenizer = TRIE_TOKENIZER('./ringrwkv/rwkv_vocab_v20230424.txt')
 
 
 #model= PeftModel.from_pretrained(model, "./lora-out")
+model = model.half()
 model = model.to(device)
 #model = torch.compile(model) #need pytorch 2.0
 
