@@ -98,7 +98,7 @@ def convert_rmkv_checkpoint_to_hf_format(
     vocab_size = 65536
     tokenizer = TRIE_TOKENIZER('./ringrwkv/rwkv_vocab_v20230424.txt')
     print('testing tokenizer...')
-    print(tokenizer.decode(tokenizer.encode("你好，我是RWKV,现在你正在将我由原生转为HF格式")))
+    print(tokenizer.decode(tokenizer.encode("--------------------------->converting to HF format")))
 
 
     # 2. Build the config
